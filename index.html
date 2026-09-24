@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HFE Analysis Tools</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/3dmol@2.5.5/build/3Dmol-min.js"></script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Clinical Genetics · Sequence analysis tools</h1>
+    <p class="sub">Is there a C282Y mutation in the <i>HFE</i> gene? Work through the tools in order.</p>
+  </div>
+  <img src="logo.png" alt="UIC Barcelona University" class="logo">
+</header>
+
+<nav>
+  <a href="#t1">1 · Annotate</a>
+  <a href="#t2">2 · Translate</a>
+  <a href="#t3">3 · Align</a>
+  <a href="#t4">4 · Structure</a>
+  <a href="#t5">5 · Disulfides</a>
+  <a href="#t6">6 · Codons</a>
+  <a href="#t7">7 · Chromatogram</a>
+</nav>
+
+<main>
+
+<section id="t1">
+  <h2><span class="n">1</span> Sequence annotation</h2>
+  <p>Locates your amplicon in the human genome (GRCh38) and returns the gene, its MANE Select transcript and the sequence with
+    <b>exons in UPPERCASE</b> and introns in lowercase.</p>
+  <p class="hint">Paste the amplicon from your in-silico PCR (a FASTA header line is fine). The reference index covers the <i>HFE</i> locus
+    (chr6:26,077,000–26,108,000).</p>
+  <textarea id="t1-in" rows="7" placeholder="Paste your DNA sequence (A, C, G, T)…" spellcheck="false"></textarea>
+  <button id="t1-go">Get sequence annotation</button>
+  <div id="t1-out" class="out"></div>
+</section>
+
+<section id="t2">
+  <h2><span class="n">2</span> Translation in six frames</h2>
+  <p>Translates a DNA sequence in the three forward and three reverse reading frames. Stop codons are shown as <code class="stop">*</code>.</p>
+  <p class="hint"><b>Think:</b> which part of the Tool 1 output should you translate? Which frame is the correct one? (The exon you amplified is part of the CDS.)</p>
+  <textarea id="t2-in" rows="5" placeholder="Paste the (exonic) DNA sequence…" spellcheck="false"></textarea>
+  <button id="t2-go">Translate</button>
+  <div id="t2-out" class="out"></div>
+</section>
+
+<section id="t3">
+  <h2><span class="n">3</span> Alignment to the reference protein</h2>
+  <p>Aligns your translated peptide to the full reference protein from UniProt. Each line starts with the reference position of its first residue,
+    so you can locate the cysteine at position 282 (C282).</p>
+  <p class="hint">Find the human HFE protein on <a href="https://www.uniprot.org/" target="_blank" rel="noopener">UniProt</a> and copy its accession code.</p>
+  <div class="row">
+    <label>UniProt accession <input id="uniprot" class="short" placeholder="e.g. P12345" spellcheck="false"></label>
+  </div>
+  <textarea id="t3-in" rows="4" placeholder="Paste your translated amino acid sequence…" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="t3-go">Align to reference</button>
+    <label>Highlight position <input id="t3-pos" class="tiny" type="number" min="1" placeholder="—"></label>
+  </div>
+  <div id="t3-out" class="out"></div>
+</section>
+
+<section id="t4">
+  <h2><span class="n">4</span> 3D structure: locate a subsequence</h2>
+  <p>Loads a structure from the <a href="https://www.rcsb.org/" target="_blank" rel="noopener">PDB</a> and highlights a stretch of amino acids in red,
+    with side chains and labels. Labels use <b>UniProt numbering</b> (structures are often numbered differently).</p>
+  <p class="hint">You need the PDB code of HFE in complex with the transferrin receptor, and the UniProt accession from Tool 3.
+    Tip: copy a few residues around C282 from the Tool 3 alignment.</p>
+  <div class="row">
+    <label>PDB code <input id="pdb" class="short" placeholder="e.g. 1ABC" spellcheck="false"></label>
+    <label>UniProt accession <input id="uniprot2" class="short" placeholder="same as Tool 3" spellcheck="false"></label>
+    <button id="t4-load">Load structure</button>
+  </div>
+  <div class="row">
+    <label class="grow">Subsequence <input id="t4-sub" placeholder="e.g. ten residues around C282" spellcheck="false"></label>
+    <button id="t4-go">Highlight</button>
+  </div>
+  <div id="t4-msg" class="out"></div>
+  <div id="t4-legend" class="legend"></div>
+  <div id="t4-view" class="viewer hidden"></div>
+</section>
+
+<section id="t5">
+  <h2><span class="n">5</span> Disulfide bridges</h2>
+  <p>Lists every cysteine of the reference protein and whether its sulfur atom (SG) is bonded to another cysteine in the structure
+    (S–S distance ≈ 2.05 Å). Click <b>Show</b> to view the bridge in 3D.</p>
+  <p class="hint">Uses the structure loaded in Tool 4.</p>
+  <div id="t5-out" class="out"></div>
+  <div id="t5-view" class="viewer hidden"></div>
+</section>
+
+<section id="t6">
+  <h2><span class="n">6</span> Codons to amino acids</h2>
+  <p>Once we have the chromatograms, we need to know <i>where</i> to look. This tool shows which codon encodes each amino acid,
+    and the position of the codon in the sequence you paste.</p>
+  <p class="hint">Paste the exonic part of the amplicon and pick the reading frame you chose in Tool 2. Find C282 using the neighbouring residues from Tool 3.</p>
+  <textarea id="t6-in" rows="5" placeholder="Paste the (exonic) DNA sequence…" spellcheck="false"></textarea>
+  <div class="row">
+    <select id="t6-frame">
+      <option value="f1">Forward frame 1</option><option value="f2">Forward frame 2</option><option value="f3">Forward frame 3</option>
+      <option value="r1">Reverse frame 1</option><option value="r2">Reverse frame 2</option><option value="r3">Reverse frame 3</option>
+    </select>
+    <button id="t6-go">Show codons</button>
+  </div>
+  <div id="t6-out" class="out"></div>
+</section>
+
+<section id="t7">
+  <h2><span class="n">7</span> Chromatogram viewer</h2>
+  <p>Open a Sanger sequencing file (<code>.ab1</code>). Search for the bases around the C282 codon to jump to it, then look at the peaks:
+    one clean peak means homozygous; two overlapping peaks of different colours at the same position means heterozygous.</p>
+  <p class="hint">Files are read in your browser; nothing is uploaded.</p>
+  <div class="row">
+    <input type="file" id="t7-file" accept=".ab1,.abi">
+    <label class="grow">Find <input id="t7-q" placeholder="e.g. 15–20 bases around the codon" spellcheck="false"></label>
+    <button id="t7-go">Find</button>
+  </div>
+  <div class="row small">
+    <label>Zoom <input type="range" id="t7-zoom" min="1" max="8" step="0.5" value="3"></label>
+    <label>Height <input type="range" id="t7-gain" min="0.5" max="6" step="0.25" value="1"></label>
+    <span class="key"><b class="bA">A</b> <b class="bC">C</b> <b class="bG">G</b> <b class="bT">T</b></span>
+  </div>
+  <div id="t7-msg" class="out"></div>
+  <div id="t7-scroll" class="chromo hidden"><div id="t7-spacer"></div><canvas id="t7-canvas"></canvas></div>
+</section>
+
+</main>
+<script src="app.js"></script>
+</body>
+</html>
