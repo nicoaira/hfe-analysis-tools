@@ -14,4 +14,6 @@ Browser-based sequence analysis tools for the Clinical Genetics practice (UIC Ba
 
 Static site, no build step and no backend: everything runs in the browser. `genome.json` holds chr6:26,077,000–26,108,000 (GRCh38) with the MANE Select exons of the genes in that window.
 
+`data/` holds offline copies of UniProt Q30201 and PDB 1DE4, used automatically if UniProt or RCSB cannot be reached.
+
 Run locally: `python3 -m http.server` in this folder, then open http://localhost:8000.

@@ -218,17 +218,32 @@ function runTool2() {
 // ---------------------------------------------------------------------------
 // Tool 3 – align peptide to UniProt reference
 // ---------------------------------------------------------------------------
+// Try the online service first; if it fails or times out, use the copy bundled in data/ (if any)
+async function fetchText(url, local, ok = t => t.length > 0) {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const t = r.ok ? await r.text() : '';
+    if (ok(t)) return { text: t, local: false };
+  } catch (e) { /* fall through to the bundled copy */ }
+  try {
+    const r = await fetch(local);
+    const t = r.ok ? await r.text() : '';
+    if (ok(t)) return { text: t, local: true };
+  } catch (e) { /* not bundled */ }
+  return null;
+}
+const offlineNote = what => `<p class="hint">${what} could not be reached; using the copy bundled with this site.</p>`;
+
 const uniprotCache = {};
 async function fetchUniprot(acc) {
   acc = acc.trim().toUpperCase();
   if (!acc) throw new Error('Please enter a UniProt accession code.');
   if (!/^[A-Z0-9]+(-\d+)?$/.test(acc)) throw new Error(`"${acc}" does not look like a UniProt accession code.`);
   if (uniprotCache[acc]) return uniprotCache[acc];
-  const r = await fetch(`https://rest.uniprot.org/uniprotkb/${acc}.fasta`);
-  const t = r.ok ? await r.text() : '';
-  if (!t.startsWith('>')) throw new Error(`Could not retrieve UniProt entry ${acc}.`);
-  const lines = t.trim().split('\n');
-  return (uniprotCache[acc] = { acc, header: lines[0].slice(1), seq: lines.slice(1).join('').trim() });
+  const res = await fetchText(`https://rest.uniprot.org/uniprotkb/${acc}.fasta`, `data/${acc}.fasta`, t => t.startsWith('>'));
+  if (!res) throw new Error(`Could not retrieve UniProt entry ${acc}.`);
+  const lines = res.text.trim().split('\n');
+  return (uniprotCache[acc] = { acc, header: lines[0].slice(1), seq: lines.slice(1).join('').trim(), local: res.local });
 }
 
 const protScore = (x, y) => (x === y ? 2 : -1);
@@ -263,7 +278,7 @@ async function runTool3() {
     }
     txt += `<span class="ln" data-n="Reference [${String(first).padStart(4)}] "></span>${ra}\n<span class="ln" data-n="${' '.repeat(17)}"></span>${mm}\n<span class="ln" data-n="Yours${' '.repeat(12)}"></span>${rb}\n\n`;
   }
-  out.innerHTML = `<dl class="kv">
+  out.innerHTML = `${ref.local ? offlineNote('UniProt') : ''}<dl class="kv">
       <dt>Reference</dt><dd>${esc(ref.header)} (${ref.seq.length} aa)</dd>
       <dt>Your sequence</dt><dd>aligns to reference residues ${aln.aStart + 1}–${aln.aEnd}; identity ${ident}/${cols} (${(100 * ident / cols).toFixed(1)}%)</dd>
     </dl>
@@ -292,15 +307,16 @@ async function loadStructure() {
   try { ref = await fetchUniprot($('uniprot2').value); } catch (e) { return (msg.innerHTML = err(e.message)); }
   if (S && S.pdb === pdb && S.ref.acc === ref.acc) return S;
   msg.innerHTML = `<p class="ok">Downloading ${pdb}…</p>`;
-  const r = await fetch(`https://files.rcsb.org/download/${pdb}.cif`);
-  if (!r.ok) return (msg.innerHTML = err(`Could not download PDB entry ${pdb}.`));
-  const cif = await r.text();
+  const res = await fetchText(`https://files.rcsb.org/download/${pdb}.cif`, `data/${pdb}.cif`, t => t.startsWith('data_'));
+  if (!res) return (msg.innerHTML = err(`Could not download PDB entry ${pdb}.`));
+  const cif = res.text;
 
   // entity names (optional, for the legend)
   const entityOf = {};
   try {
     const qry = `{entry(entry_id:"${pdb}"){polymer_entities{rcsb_polymer_entity{pdbx_description}rcsb_polymer_entity_container_identifiers{auth_asym_ids}}}}`;
-    const j = await (await fetch('https://data.rcsb.org/graphql?query=' + encodeURIComponent(qry))).json();
+    const e = await fetchText('https://data.rcsb.org/graphql?query=' + encodeURIComponent(qry), `data/${pdb}.entities.json`, t => t.includes('polymer_entities'));
+    const j = JSON.parse(e.text);
     j.data.entry.polymer_entities.forEach((e, k) => e.rcsb_polymer_entity_container_identifiers.auth_asym_ids.forEach(ch =>
       (entityOf[ch] = { k, name: e.rcsb_polymer_entity.pdbx_description })));
   } catch (e) { /* legend falls back to chain ids */ }
@@ -361,7 +377,7 @@ async function loadStructure() {
   resetStyle();
   viewer.zoomTo(); viewer.render();
   const m0 = mapped[0], r0 = m0.res.find(r => r.uni);
-  msg.innerHTML = `<p class="ok">Loaded ${pdb}: ${ids.length} protein chains. Chain${mapped.length > 1 ? 's' : ''} ${mapped.map(c => c.id).join(', ')} match ${ref.acc}
+  msg.innerHTML = `${res.local || ref.local ? offlineNote([ref.local && 'UniProt', res.local && 'RCSB PDB'].filter(Boolean).join(' and ')) : ''}<p class="ok">Loaded ${pdb}: ${ids.length} protein chains. Chain${mapped.length > 1 ? 's' : ''} ${mapped.map(c => c.id).join(', ')} match ${ref.acc}
     (UniProt residues ${m0.res.find(r => r.uni).uni}–${[...m0.res].reverse().find(r => r.uni).uni} are resolved in chain ${m0.id}).
     Numbering: UniProt ${r0.uni} = PDB ${r0.resi} in chain ${m0.id}.</p>`;
   buildDisulfideTable();
